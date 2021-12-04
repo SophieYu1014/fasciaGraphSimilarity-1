@@ -1544,11 +1544,11 @@ int main(int argc, char** argv)
     sim1(m, iterations, p, true, isCentered);
   }
   else if(sim2_corr) {
-    const char folderCorr [] = "sim2_corr/";
+    const char folderCorr [] = "correlated_graphs/";
     char graphACorr [100];
-    sprintf(graphACorr, "%s%d_%dA_%.5f_%.5f_corr.txt", folderCorr, m, n, p, s);
+    sprintf(graphACorr, "%s%d_%dA_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, p, s);
     char graphBCorr [100];
-    sprintf(graphBCorr, "%s%d_%dB_%.5f_%.5f_corr.txt", folderCorr, m, n, p, s);
+    sprintf(graphBCorr, "%s%d_%dB_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, p, s);
     if(n && p && s && m && iterations) {
         // printf("%d %f %f %d %d %d %d %d correlated Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
         sim2(graphACorr, graphBCorr, n, p, s, klow, motif, m, iterations, isCentered, sophie);
@@ -1559,11 +1559,11 @@ int main(int argc, char** argv)
     }
   }
   else if(sim2_ind) {
-    const char folderInd [] = "sim2_ind/";
+    const char folderInd [] = "independent_graphs/";
     char graphAInd [100];
-    sprintf(graphAInd, "%s%d_%dA_%.5f_%.5f_ind.txt", folderInd, m, n, p, s);
+    sprintf(graphAInd, "%s%d_%dA_q%.5f_ind.txt", folderInd, m, n, s);
     char graphBInd [100];
-    sprintf(graphBInd, "%s%d_%dB_%.5f_%.5f_ind.txt", folderInd, m, n, p, s);
+    sprintf(graphBInd, "%s%d_%dB_q%.5f_ind.txt", folderInd, m, n, s);
     if(n && p && s && m && iterations) {
         // printf("%d %f %f %d %d %d %d %d indepedent Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
         sim2(graphAInd, graphBInd, n, p, s, klow, motif, m, iterations, isCentered, sophie);
