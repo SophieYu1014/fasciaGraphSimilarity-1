@@ -829,8 +829,8 @@ void generate_ind_graphs(int n, float p, float s, int m_rep) {
     char graphB [100];
     sprintf(graphB, "%s%d_%dB_%.5f_%.5f_ind.txt", folder, m_rep, n, p, s);
     
-    generate_graph(n, p, graphA);
-    generate_graph(n, p, graphB);
+    generate_graph(n, p*s, graphA);
+    generate_graph(n, p*s, graphB);
 
 }
 
