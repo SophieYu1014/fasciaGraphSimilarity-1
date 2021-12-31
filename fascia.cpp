@@ -881,12 +881,12 @@ void sim2(char* graph_fileA, char* graph_fileB, int n, float p, float s, int klo
       if(Sophie) {
         for(int j = 0; j < iterations; ++j) {
           // printf("Total: %e\n", count);
-          count += run_algorithm2(graph_fileA, graph_fileB, k, false, false, false, 1, false, true, false, true, p*s, true, isCentered);
+          count += run_algorithm2(graph_fileA, graph_fileB, k, false, false, false, 1, false, true, false, true, p, true, isCentered);
         }
         count /= iterations;
       }
       else {
-        count = run_compare_graphs(graph_fileA, graph_fileB, k, false, false, iterations, false, true, false, true, p*s, false, isCentered);
+        count = run_compare_graphs(graph_fileA, graph_fileB, k, false, false, iterations, false, true, false, true, p, false, isCentered);
       }
 
 // }
@@ -1546,9 +1546,9 @@ int main(int argc, char** argv)
   else if(sim2_corr) {
     const char folderCorr [] = "correlated_graphs/";
     char graphACorr [100];
-    sprintf(graphACorr, "%s%d_%dA_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, p, s);
+    sprintf(graphACorr, "%s%d_%dA_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, s, p);
     char graphBCorr [100];
-    sprintf(graphBCorr, "%s%d_%dB_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, p, s);
+    sprintf(graphBCorr, "%s%d_%dB_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, s, p);
     if(n && p && s && m && iterations) {
         // printf("%d %f %f %d %d %d %d %d correlated Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
         sim2(graphACorr, graphBCorr, n, p, s, klow, motif, m, iterations, isCentered, sophie);
@@ -1561,9 +1561,9 @@ int main(int argc, char** argv)
   else if(sim2_ind) {
     const char folderInd [] = "independent_graphs/";
     char graphAInd [100];
-    sprintf(graphAInd, "%s%d_%dA_q%.5f_ind.txt", folderInd, m, n, s);
+    sprintf(graphAInd, "%s%d_%dA_q%.5f_ind.txt", folderInd, m, n, p);
     char graphBInd [100];
-    sprintf(graphBInd, "%s%d_%dB_q%.5f_ind.txt", folderInd, m, n, s);
+    sprintf(graphBInd, "%s%d_%dB_q%.5f_ind.txt", folderInd, m, n, p);
     if(n && p && s && m && iterations) {
         // printf("%d %f %f %d %d %d %d %d indepedent Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
         sim2(graphAInd, graphBInd, n, p, s, klow, motif, m, iterations, isCentered, sophie);

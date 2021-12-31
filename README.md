@@ -2,12 +2,15 @@
 
 to generate graph independently, run the following function:
 
-    ./generateGraphs -n $NODE_COUNT -m $GRAPH_COUNT -r $RELATEDNESS -q $DENSITY
+    ./generateGraphs -n $NODE_COUNT -m $GRAPH_COUNT -r $RELATEDNESS -q $DENSITY -i $GENERATE_INDEPENDENT_GRAPH
 
 The graphs will then be generated in `independent_graphs/` and `correlated_graphs` in the following format:
 
     3_100B_rho1.00000_q0.01000_corr.txt
-    2_100A_q0.01000_ind.txt
+
+if -i is specified, then ONLY independent graphs will be generated, -r in this case would not be needed.
+
+    2_100A_q0.01000_ind.txt 
 
 The main software has been updated to run tree counting and matching on these file, run as normal:
 

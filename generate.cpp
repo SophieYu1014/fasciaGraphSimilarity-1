@@ -21,7 +21,6 @@ q - graph density
 n - node count
 m - generate m graphs (adjustable)
 
-This file is the idea of Sophie Yu, and is written by Rocky Li
 */
 
 void write_graph_to_file(int n, vector<tuple<int, int>> edges, char filename[100])
@@ -90,7 +89,7 @@ void generate_ind_graphs(int n, float q, int m_rep) {
     generate_graph_new(n, 0, q, graphA, graphB);
 }
 
-void generate_all_graphs(int n, float rho, float q, int m) {
+void generate_all_graphs(int n, float rho, float q, int m, bool i) {
     using std::chrono::high_resolution_clock;
     using std::chrono::duration_cast;
     using std::chrono::duration;
@@ -99,8 +98,8 @@ void generate_all_graphs(int n, float rho, float q, int m) {
     auto a1 = high_resolution_clock::now();
 
     for(int m_rep = 1; m_rep < m+1; ++m_rep) {
-        generate_corr_graphs(n, rho, q, m_rep);
-        generate_ind_graphs(n, q, m_rep);
+	if (i) generate_ind_graphs(n, q, m_rep);
+	else generate_corr_graphs(n, rho, q, m_rep);
     }
 
     auto a2 = high_resolution_clock::now();
@@ -116,10 +115,11 @@ int main(int argc, char** argv)
     int m;
     float rho;
     float q;
+    bool gi = false;
 
     char c;
     int argCount = 0;
-    while ((c = getopt(argc, argv, "n:m:r:q:")) != -1) {
+    while ((c = getopt(argc, argv, "n:m:r:q:i")) != -1) {
         switch(c) {
             case 'n':
                 n = atoi(optarg);
@@ -139,15 +139,19 @@ int main(int argc, char** argv)
             case 'q':
                 q = atof(optarg);
                 argCount++;
-                printf("Setting parameter q to %.5f\n", rho);
+                printf("Setting parameter q to %.5f\n", q);
                 break;
+	    case 'i':
+		gi = true;
+		argCount++;
+		break;
             default:
                 abort();
         }
     }
     if (argCount < 4) {
-        printf("YOU DID NOT PROVIDE ALL REQUIRED ARGUMENTS!\n");
+        std::cout << "YOU DID NOT PROVIDE ALL REQUIRED ARGUMENTS!" << std::endl;
         abort();
     }
-    generate_all_graphs(n, rho, q, m);
+    generate_all_graphs(n, rho, q, m, gi);
 }
