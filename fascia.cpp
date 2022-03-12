@@ -149,118 +149,6 @@ void read_in_graph(Graph& g, char* graph_file, bool labeled,
   //print_my_graph(g);
 }
 
-double run_single(char* graph_file, char* template_file, bool labeled,
-                bool do_vert, bool do_gdd,
-                int iterations, 
-                bool do_outerloop, bool calc_auto, bool verbose, bool random_graphs, float p, bool main, bool isCentered)
-{
-  Graph g;
-  Graph t;
-  int* srcs_g;
-  int* dsts_g;
-  int* labels_g;
-  int* srcs_t;
-  int* dsts_t;
-  int* labels_t;
-  char* vert_file = new char[1024];
-  char* gdd_file = new char[1024];
-
-  if (do_vert) {
-    strcat(vert_file, template_file);
-    strcat(vert_file, ".vert");
-  }
-  if (do_gdd) {
-    strcat(gdd_file, template_file);
-    strcat(gdd_file, ".gdd");
-  }
-
-  read_in_graph(g, graph_file, labeled, srcs_g, dsts_g, labels_g);
-  read_in_graph(t, template_file, labeled, srcs_t, dsts_t, labels_t);
-
-  double elt = 0.0;
-  if ((timing || verbose) && main) {
-    elt = timer();
-  }
-  double full_count = 0.0;  
-  if (do_outerloop)
-  {
-    int num_threads = omp_get_max_threads();
-    int iter = ceil( (double)iterations / (double)num_threads + 0.5);
-    
-    colorcount* graph_count = new colorcount[num_threads];
-    for (int tid = 0; tid < num_threads; ++tid) {
-      graph_count[tid].init(g, labels_g, labeled, 
-                            calc_auto, do_gdd, do_vert, verbose);
-    }
-
-    double** vert_counts;
-    if (do_gdd || do_vert)
-      vert_counts = new double*[num_threads];
-
-#pragma omp parallel reduction(+:full_count)
-{
-    int tid = omp_get_thread_num();
-    full_count += graph_count[tid].do_full_count(&t, labels_t, iter, random_graphs, p, isCentered, 23);
-    if (do_gdd || do_vert)
-      vert_counts[tid] = graph_count[tid].get_vert_counts();
-}   
-    full_count /= (double)num_threads;
-    if (do_gdd || do_vert)
-    {
-      output out(vert_counts, num_threads, g.num_vertices());
-      if (do_gdd) {
-        out.output_gdd(gdd_file);
-        free(gdd_file);
-      } 
-      if (do_vert) {        
-        out.output_verts(vert_file);
-        free(vert_file);
-      }
-    }
-  }
-  else
-  {
-    colorcount graph_count;
-    graph_count.init(g, labels_g, labeled, 
-                      calc_auto, do_gdd, do_vert, verbose);
-    full_count += graph_count.do_full_count(&t, labels_t, iterations, random_graphs, p, isCentered, 23);
-
-    if (do_gdd || do_vert)
-    {
-      double* vert_counts = graph_count.get_vert_counts();
-      output out(vert_counts, g.num_vertices());
-      if (do_gdd)
-      {
-        out.output_gdd(gdd_file);
-        free(gdd_file);
-      }
-      if (do_vert)
-      {
-        out.output_verts(vert_file);
-        free(vert_file);
-      }
-    }
-  }
-
-  // printf("%e", full_count);
-
-  if ((timing || verbose) && main) {
-    elt = timer() - elt;
-    printf("Total time:\n\t%9.6lf seconds\n", elt);
-  }
-
-  delete [] srcs_g;
-  delete [] dsts_g;
-  delete [] labels_g;
-  delete [] srcs_t;
-  delete [] dsts_t;
-  delete [] labels_t;
-  
-  return full_count;
-
-}
-
-
 std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
                 bool do_vert, bool do_gdd,
                 int iterations, 
@@ -418,198 +306,6 @@ std::vector<double> run_motif(char* graph_file, int motif,
             do_outerloop, calc_auto, verbose, random_graphs, p, main, isCentered, colorKey);
 }
 
-double run_algorithm2(char* graph_fileA, char* graph_fileB, int motif, bool labeled,
-                bool do_vert, bool do_gdd, 
-                int iterations, 
-                bool do_outerloop, bool calc_auto, bool verbose, bool random_graphs, float p, bool main, bool isCentered) {
-  Graph gA;
-  Graph gB;
-  Graph t;
-  int* srcs_gA;
-  int* dsts_gA;
-  int* labels_gA;
-  int* srcs_t;
-  int* dsts_t;
-  int* srcs_gB;
-  int* dsts_gB;
-  int* labels_gB;
-  int* labels_t;
-  char* vert_file;
-  char* gdd_file;
-
-  char* motif_batchfile = NULL;
-
-  switch(motif)
-  {
-    case(3):
-      motif_batchfile = strdup("motif/graphs_n3_1/batchfile");
-      break;
-    case(4):
-      motif_batchfile = strdup("motif/graphs_n4_2/batchfile");
-      break;
-    case(5):
-      motif_batchfile = strdup("motif/graphs_n5_3/batchfile");
-      break;
-    case(6):
-      motif_batchfile = strdup("motif/graphs_n6_6/batchfile");
-      break;
-    case(7):
-      motif_batchfile = strdup("motif/graphs_n7_11/batchfile");
-      break;
-    case(8):
-      motif_batchfile = strdup("motif/graphs_n8_23/batchfile");
-      break;
-    case(9):
-      motif_batchfile = strdup("motif/graphs_n9_47/batchfile");
-      break;
-    case(10):
-      motif_batchfile = strdup("motif/graphs_n10_106/batchfile");
-      break;
-    default:
-      break;
-  }
-
-  double final_count = 0.0;
-  int colorKey_A = rand();
-  int colorKey_B = rand();
-
-
-  read_in_graph(gA, graph_fileA, labeled, srcs_gA, dsts_gA, labels_gA);
-  read_in_graph(gB, graph_fileB, labeled, srcs_gB, dsts_gB, labels_gB);
-
-  double elt = 0.0;
-  if ((timing || verbose) && main) {
-    elt = timer();
-  }
-
-  ifstream if_batch;
-  string line;
-  if_batch.open(motif_batchfile);
-  while (getline(if_batch, line))
-  {   
-    char* template_file = strdup(line.c_str());
-    read_in_graph(t, template_file, labeled, srcs_t, dsts_t, labels_t);
-
-    double full_countA = 0.0;
-    double full_countB = 0.0;
-
-    
-
-    if (do_outerloop)
-    {
-      int num_threads = omp_get_max_threads();
-      int iter = ceil( (double)iterations / (double)num_threads + 0.5);
-      
-      colorcount* graph_countA = new colorcount[num_threads];
-      colorcount* graph_countB = new colorcount[num_threads];
-      for (int i = 0; i < num_threads; ++i) {
-        graph_countA[i].init(gA, labels_gA, labeled, 
-                            calc_auto, do_gdd, do_vert, verbose);
-        graph_countB[i].init(gB, labels_gB, labeled, 
-                            calc_auto, do_gdd, do_vert, verbose);
-      }
-
-    
-      double** vert_counts;
-      if (do_gdd || do_vert)
-        vert_counts = new double*[num_threads];
-
-#pragma omp parallel reduction(+:full_countA)
-{
-      int tid = omp_get_thread_num();
-      full_countA += graph_countA[tid].do_full_count(&t, labels_t, iter, random_graphs, p, isCentered, colorKey_A);
-
-
-      if (do_gdd || do_vert)
-        vert_counts[tid] = graph_countA[tid].get_vert_counts();
-}
-#pragma omp parallel reduction(+:full_countB)
-{
-      int tid = omp_get_thread_num();
-      full_countB += graph_countB[tid].do_full_count(&t, labels_t, iter, random_graphs, p, isCentered, colorKey_B);
-      
-      if (do_gdd || do_vert)
-        vert_counts[tid] = graph_countB[tid].get_vert_counts();
-}
-
-      full_countA /= (double)num_threads;
-      full_countB /= (double)num_threads;
-      if (do_gdd || do_vert)
-      {
-        output out(vert_counts, num_threads, gA.num_vertices());
-        if (do_gdd) {
-          gdd_file = strdup(template_file);
-          strcat(gdd_file, ".gdd");
-          out.output_gdd(gdd_file);
-          free(gdd_file);
-        }
-        if (do_vert) {
-          vert_file = strdup(template_file);
-          strcat(vert_file, ".vert");
-          out.output_verts(vert_file);
-          free(vert_file);
-        }
-      }
-    }
-    else
-    {
-      colorcount graph_countA;
-      colorcount graph_countB;
-      
-      // printf("fullcountA: %e\n", full_countA);
-      // printf("fullcountB: %e\n", full_countB);
-
-      graph_countA.init(gA, labels_gA, labeled, 
-                        calc_auto, do_gdd, do_vert, verbose);
-      graph_countB.init(gB, labels_gB, labeled, 
-                        calc_auto, do_gdd, do_vert, verbose);
-      full_countA += graph_countA.do_full_count(&t, labels_t, iterations, random_graphs, p, isCentered, colorKey_A);
-      full_countB += graph_countB.do_full_count(&t, labels_t, iterations, random_graphs, p, isCentered, colorKey_B);
-    }
-
-    double sophie_check_A = 0.0;
-    double sophie_check_B = 0.0;
-    double sophie_check_product = 0.0;
-    sophie_check_A = full_countA - (61 / count_automorphisms(t));
-    printf("fullcountA_centered: %f\n",  sophie_check_A);
-    sophie_check_B = full_countB - (61 / count_automorphisms(t));
-    printf("fullcountB_centered: %f\n",  sophie_check_B);
-    sophie_check_product = sophie_check_A * sophie_check_B;
-    printf("product: %f\n",  sophie_check_product);
-    // check count_automorphisms
-    printf("num of automorphisms: %d\n", count_automorphisms(t));
-    final_count +=( full_countA - (61/ count_automorphisms(t)))* (full_countB-(61/ count_automorphisms(t))) * count_automorphisms(t);
-    //printf("%e\n", final_countA - (61/ count_automorphisms(t)));
-    //printf("%e\n", final_countB - (61/ count_automorphisms(t)));
-
-
-    delete [] srcs_t;
-    delete [] dsts_t;
-    delete [] labels_t;
-    delete [] template_file;
-  }
-
-  if_batch.close();
-
-if ((timing || verbose) && main) {
-  elt = timer() - elt;
-  printf("Total time:\n\t%9.6lf seconds\n", elt);
-}
-
-  delete [] srcs_gA;
-  delete [] dsts_gA;
-  delete [] labels_gA;
-  delete [] srcs_gB;
-  delete [] dsts_gB;
-  delete [] labels_gB;
-
-  // printf("%e\n", final_count);
-
-  return final_count;
-                  
-
-}
-
 double run_compare_graphs(char* graph_fileA, char* graph_fileB, int motif, 
                 bool do_vert, bool do_gdd, 
                 int iterations, 
@@ -689,97 +385,6 @@ double calculateExpectedValue(int n, float p, int K, int aut) {
     return fac;
 }
 
-void sim1(int m, int iterations, float p, bool random_graphs, bool isCentered) {
-
-    using std::chrono::high_resolution_clock;
-    using std::chrono::duration_cast;
-    using std::chrono::duration;
-    using std::chrono::milliseconds;
-    //runs simulation 1
-    Graph t;
-    int* srcs_t;
-    int* dsts_t;
-    int* labels_t;
-
-    char tree_file[] = "template.graph";
-
-    read_in_graph(t, tree_file, false, srcs_t, dsts_t, labels_t);
-    int aut = count_automorphisms(t);
-
-    int K = 6;
-    double r = factorial(K+1)/pow(K+1, K+1);
-    int tconst = floor(1/pow(r,2));
-    
-
-    std::vector<int> m_sizes;
-
-    for (int i = 1; i <= 20; ++i) {
-      m_sizes.push_back(i * 50);
-    }
-
-    //m_sizes.push_back(100);
-    //m_sizes.push_back(500);
-    //m_sizes.push_back(1000);
-    //m_sizes.push_back(10000);  
-
-    std::vector<double> fin_counts;
-    std::vector<double> expected_counts;
-    double val;
-    double expectedVal;
-    double total_time;
-    double avg_time;
-
-    cout << "\n";
-
-    for (const int& i : m_sizes) {
-      val = 0;
-      expectedVal = 0;
-      // cout << i << "\n";
-      // expectedVal = calculateExpectedValue(i, p, K, aut);
-      // cout << "\nExpected Value: " << expectedVal << "\n";
-      // cout << "[";
-      for(int j = 0; j < m; ++j) {
-        char graph_file [100];
-        sprintf (graph_file, "graphs/%d.txt", i);
-        generate_graph(i, p, graph_file);
-        auto a1 = high_resolution_clock::now();
-        val = val + run_single(graph_file, tree_file, false, false, false, iterations, false, true, false, random_graphs, p, false, isCentered);
-
-        auto a2 = high_resolution_clock::now();
-
-        auto ms_int = duration_cast<milliseconds>(a2-a1);
-
-        duration<double, std::milli> ms_double = a2 - a1;
-
-        total_time += ms_double.count();
-        // cout << ", ";
-        cout.flush();   
-      }
-      val = val / m;
-      avg_time = total_time / m;
-      fin_counts.push_back(val);
-      // cout<<'\b';
-      // cout<<'\b';
-      // cout<<"]\n";
-      cout << avg_time << "\n";
-      cout.flush();      
-      // expected_counts.push_back(expectedVal * r);
-    }
-
-    // cout << '[';
-    // for (const double& d : fin_counts) {
-    //   cout << d << ',';
-    // }
-    // cout << "]\n";
-
-    // cout << '[';
-    // for (const double& d : expected_counts) {
-    //   cout << d << ',';
-    // }
-    // cout << "]\n";
-    cout.flush();
-}
-
 void select_edges(float s, char in [100], char out [100]) {
 
     int n;
@@ -817,60 +422,6 @@ void select_edges(float s, char in [100], char out [100]) {
 
 }
 
-void generate_corr_graphs(int n, float p, float s, int m_rep) {
-    const char folder [] = "sim2_corr/";
-    char in [100];
-    sprintf(in, "%s%d_og.txt", folder, m_rep);
-    char graphA [100];
-    sprintf(graphA, "%s%d_%dA_%.5f_%.5f_corr.txt", folder, m_rep, n, p, s);
-    char graphB [100];
-    sprintf(graphB, "%s%d_%dB_%.5f_%.5f_corr.txt", folder, m_rep, n, p, s);
-    
-    generate_graph(n, p, in);
-    select_edges(s, in, graphA);
-    select_edges(s, in, graphB);
-}
-
-void generate_ind_graphs(int n, float p, float s, int m_rep) {
-    const char folder [] = "sim2_ind/";
-    char graphA [100];
-    sprintf(graphA, "%s%d_%dA_%.5f_%.5f_ind.txt", folder, m_rep, n, p, s);
-    char graphB [100];
-    sprintf(graphB, "%s%d_%dB_%.5f_%.5f_ind.txt", folder, m_rep, n, p, s);
-    
-    generate_graph(n, p*s, graphA);
-    generate_graph(n, p*s, graphB);
-
-}
-
-void generate_both_graphs(int n, float p, float s, int m) {
-    using std::chrono::high_resolution_clock;
-    using std::chrono::duration_cast;
-    using std::chrono::duration;
-    using std::chrono::milliseconds;
-
-
-    // double r = (double) factorial(tree_len+1) / pow(tree_len+1, tree_len+1);
-    // int t = floor(1/ pow(r,2));
-    
-    auto a1 = high_resolution_clock::now();
-
-    for(int m_rep = 1; m_rep < m+1; ++m_rep) {
-      generate_corr_graphs(n, p, s, m_rep);
-      generate_ind_graphs(n, p, s, m_rep);
-    }
-
-
-    auto a2 = high_resolution_clock::now();
-
-    auto ms_int = duration_cast<milliseconds>(a2-a1);
-
-    duration<double, std::milli> ms_double = a2 - a1;
-
-    std::cout << "\nTime to generate graphs: " << ms_double.count() << "ms";
-
-}
-
 void sim2(char* graph_fileA, char* graph_fileB, int n, float p, float s, int klow, int khigh, int m, int iterations, bool isCentered, bool Sophie) {
     using std::chrono::high_resolution_clock;
     using std::chrono::duration_cast;
@@ -887,17 +438,7 @@ void sim2(char* graph_fileA, char* graph_fileB, int n, float p, float s, int klo
 
 // #pragma omp parallel reduction(+:count)
 // {
-      if(Sophie) {
-        for(int j = 0; j < iterations; ++j) {
-          // printf("Total: %e\n", count);
-          count += run_algorithm2(graph_fileA, graph_fileB, k, false, false, false, 1, false, true, false, true, p, true, isCentered);
-        }
-        count /= iterations;
-      }
-      else {
-        count = run_compare_graphs(graph_fileA, graph_fileB, k, false, false, iterations, false, true, false, true, p, false, isCentered);
-      }
-
+      count = run_compare_graphs(graph_fileA, graph_fileB, k, false, false, iterations, false, true, false, true, p, false, isCentered);
 // }
 
       printf("%e, ", count);
@@ -1062,215 +603,6 @@ void sample_edges(int sample_edges, char in [100], char out [100]) {
 
 }
 
-void all_comp(string file_list, bool do_vert, bool do_gdd, int iterations, bool do_outerloop, bool calc_auto, bool verbose) {
-  
-  int mot_min = 3;
-  int mot_mx = 10;
-  string directory = "small_fb";
-
-  vector<string> graphs;
-
-  ifstream file(file_list);
-  string line;
-  while (getline(file, line)) {;
-      graphs.push_back(line);
-  }
-  file.close();
-
-  char nameA [100];
-  char nameB [100];
-  char graph_fileA [100];
-  char graph_fileB [100];
-  string temp_path;
-  double comp_val;
-
-  for (int n = mot_min; n <= mot_mx; ++n) {
-    for (int j = 0; j < graphs.size(); ++j) {
-      sprintf(nameB, graphs.at(j).c_str());
-      sprintf (graph_fileB, "%s/%s", directory.c_str(), nameB);
-      for (int i = 0; i < j + 1; ++i) {
-        sprintf(nameA, graphs.at(i).c_str());
-        sprintf (graph_fileA, "%s/%s", directory.c_str(), nameA);
-          comp_val = run_compare_graphs(graph_fileA, graph_fileB, n, 
-                  do_vert, do_gdd, 
-                  iterations, do_outerloop, calc_auto, 
-                  verbose, false, 0, false, true);
-          cout << nameA << "," << nameB << "," << n << "," << comp_val << "\n";
-      }
-    }
-  }
-
-  cout.flush();
-
-}
-
-void samp_graphs(char* graph, int iterations, int it_edges, int samp_nodes, int samp_edges) {
-
-  string directory_in = "small_fb";
-  string directory_out = "samp_run";
-
-  char in [100];
-  char out_n [100];
-  char out_e [100];
-
-  int count = 1;
-  sprintf(in, "%s/%s", directory_in.c_str(), graph);
-    for (int node_rep = 1; node_rep <= iterations; ++node_rep) {
-      sprintf(out_n, "%s/n%d_%s", directory_out.c_str(), node_rep, graph);
-      sample_nodes(samp_nodes, in, out_n);
-      for (int edge_rep = 1; edge_rep <= it_edges; ++edge_rep) {
-        sprintf(out_e, "%s/e%d_%s", directory_out.c_str(), count, graph);
-        sample_edges(samp_edges, out_n, out_e);
-        ++count;
-      }
-    }
-}
-
-void samp_graphs_lst(string file_list, int iterations, int it_edges, int samp_nodes, int samp_edges) {
-
-  ifstream file(file_list);
-  string line;
-  char name [100];
-
-  while (getline(file, line)) {
-    strncpy(name, line.c_str(), 100);
-    samp_graphs(name, iterations, it_edges, samp_nodes, samp_edges);
-  }
-  file.close();
-}
-
-double samp_comp(char* graph_fileA, char* graph_fileB, int motif, 
-                bool do_outerloop, int iterations, int it_edges, int samp_nodes, int samp_edges, int comp_it, bool calc_auto, bool isCentered, bool generateGraphs)
-{
-  
-  double elt;
-  if (timing) {
-    elt = timer();
-  }
-
-  if (generateGraphs) {
-    samp_graphs(graph_fileA, iterations, it_edges, samp_nodes, samp_edges);
-    samp_graphs(graph_fileB, iterations, it_edges, samp_nodes, samp_edges);
-  }
-
-  string directory = "small_fb";
-  string out_dir = "samp_run";
-
-  char in_1 [100];
-  sprintf(in_1, "%s/%s", directory.c_str(), graph_fileA);
-  char in_2 [100];
-  sprintf(in_2, "%s/%s", directory.c_str(), graph_fileB);
-
-  int n_A;
-  int edges_A;
-  ifstream fileA(in_1);
-  fileA >> n_A;
-  fileA >> edges_A;
-  fileA.close();
-
-  int n_B;
-  int edges_B;
-  ifstream fileB(in_2);
-  fileB >> n_B;
-  fileB >> edges_B;
-  fileB.close();
-
-  if (min(n_A, n_B) < samp_nodes) {
-    cout << "Too small to sample, at least one graph has nodes less than " << samp_nodes << ".\n";
-    samp_nodes = min(n_A, n_B) / 2;
-    cout << "Sampling with nodes " << samp_nodes << " instead.\n";
-    cout.flush();
-  }
-
-  double simi_val;
-  char out_e_1 [100];
-  char out_e_2 [100];
-
-  vector<double> simi_scores;
-
-  for (int r1 = 1; r1 <= iterations * it_edges; ++r1) {
-    for (int r2 = 1; r2 <= iterations * it_edges; ++r2) {
-      sprintf(out_e_1, "%s/e%d_%s", out_dir.c_str(), r1, graph_fileA);
-      sprintf(out_e_2, "%s/e%d_%s", out_dir.c_str(), r2, graph_fileB);
-      simi_val = run_algorithm2(out_e_1, out_e_2, motif, 
-                false, false, false,
-                comp_it, do_outerloop, calc_auto, 
-                false, false, 0, false, isCentered);
-      simi_scores.push_back(simi_val);
-    }
-  }
-
-  double avg = 0;
-  cout << graph_fileA << "," << graph_fileB << "," << motif << ",";
-  cout.flush();
-  for (int i = 0; i <  simi_scores.size(); ++i) {
-    cout << simi_scores.at(i) << ",";
-    cout.flush();
-    avg += simi_scores.at(i);
-  }
-
-  avg = avg / simi_scores.size();
-  cout << " avg: " << avg;
-  cout.flush();
-
-  if (timing) {
-    cout << ", timing: " << timer() - elt;
-  }
-
-  return avg;
-
-}
-
-vector<double> samp_comp_all_n(char* graph_fileA, char* graph_fileB,
-                bool do_outerloop, int iterations, int it_edges, int samp_nodes, int samp_edges, int comp_it, bool calc_auto, bool isCentered, bool generateGraphs)
-{
-
-  if (generateGraphs) {
-    samp_graphs(graph_fileA, iterations, it_edges, samp_nodes, samp_edges);
-    samp_graphs(graph_fileB, iterations, it_edges, samp_nodes, samp_edges);
-  }
-
-  vector<double> vals;
-  double temp_val;
-
-  int min_motif = 5;
-  int max_motif = 5;
-
-  for (int motif = min_motif; motif <= max_motif; ++motif) {
-    temp_val = samp_comp(graph_fileA, graph_fileB, motif, do_outerloop, iterations, it_edges, samp_nodes, samp_edges, comp_it, calc_auto, isCentered, false);
-    vals.push_back(temp_val);
-    cout << "\n";
-    cout.flush();
-  }
-
-  return vals;
-}
-
-void samp_all_dcc(string file_lst, 
-                bool do_outerloop, int iterations, int it_edges, int samp_nodes, int samp_edges, int comp_it, bool calc_auto, bool isCentered)
-{
-
-  string directory_in = "small_fb";
-  ifstream file(file_lst);
-
-  string line;
-  string file1;
-  string file2;
-  char in1 [100];
-  char in2 [100];
-
-  while (getline(file, line)) {
-    stringstream ss(line);
-    getline(ss, file1, ',');
-    getline(ss, file2, ',');
-    strncpy(in1, file1.c_str(), 100);
-    strncpy(in2, file2.c_str(), 100);
-    samp_comp_all_n(in1, in2, do_outerloop, iterations, it_edges, samp_nodes, samp_edges, comp_it, calc_auto, isCentered, false);
-  }
-  file.close();
-
-}
-
 void all_trees(char* graph_file, char* out, int iterations, 
         bool do_outerloop, bool isCentered) {
 
@@ -1344,7 +676,6 @@ int main(int argc, char** argv)
 
   char* graph_fileA = NULL;
   char* graph_fileB = NULL;
-  char* template_file = NULL;
   char* batch_file = NULL;
   int iterations = 1;
   bool do_outerloop = false;
@@ -1354,14 +685,9 @@ int main(int argc, char** argv)
   bool do_vert = false;
   bool verbose = false;
   bool compare_graphs = false;
-  bool sim_1 = false;
   bool sim2_corr = false;
   bool sim2_ind = false;
   int klow = 0;
-  bool many_comp = false;
-  bool small_sample = false;
-  bool all_n_sample = false;
-  bool samp_from_lst = false;
   bool count_trees = false;
   int it_edges = 1;
   int samp_nodes = 1000;
@@ -1373,12 +699,10 @@ int main(int argc, char** argv)
   float s = 0.0;
   int m = 0;
   bool isCentered = false;
-  bool generateGraphs = false;
-  bool samp_first = false;
   bool sophie = false;
 
   char c;
-  while ((c = getopt (argc, argv, "g:f:t:b:m:n:p:s:j:i:k:A:B:C:H:SGDEFuWXqacdvrohlxyze")) != -1)
+  while ((c = getopt (argc, argv, "g:f:b:m:n:p:s:j:i:k:A:B:C:H:SDWXqacdvrohlz")) != -1)
   {
     switch (c)
     {
@@ -1393,9 +717,6 @@ int main(int argc, char** argv)
         break;
       case 'f':
         graph_fileB = strdup(optarg);
-        break;
-      case 't':
-        template_file = strdup(optarg);
         break;
       case 'b':
         batch_file = strdup(optarg);
@@ -1436,14 +757,8 @@ int main(int argc, char** argv)
       case 'S':
         sophie = true;
         break;
-      case 'G':
-        generateGraphs = true;
-        break;
       case 'D':
         isCentered = true;
-        break;
-      case 'u':
-        sim_1 = true;
         break;
       case 'W':
         sim2_corr = true;
@@ -1453,21 +768,6 @@ int main(int argc, char** argv)
         break;
       case 'q':
         compare_graphs = true;
-        break;
-      case 'x':
-        many_comp = true;
-        break;
-      case 'y':
-        small_sample = true;
-        break;
-      case 'e':
-        all_n_sample = true;
-        break;
-      case 'F':
-        samp_from_lst = true;
-        break;
-      case 'E':
-        samp_first = true;
         break;
       case 'z':
         count_trees = true;
@@ -1503,11 +803,10 @@ int main(int argc, char** argv)
         abort();
     }
   } 
-  if(!generateGraphs && !sim_1 && !sim2_corr && !sim2_ind && !many_comp && !small_sample && !count_trees && !all_n_sample && !samp_first && !samp_from_lst)
+  if(!sim2_corr && !sim2_ind && !count_trees)
   {
     if(argc < 3)
     {
-        printf("%d",sim_1);
         print_info_short(argv[0]);
     }
 
@@ -1521,12 +820,12 @@ int main(int argc, char** argv)
       printf("\nMust supply graph file\n");    
       print_info(argv[0]);
     }
-    else if (template_file == NULL && batch_file == NULL && !motif)
+    else if (batch_file == NULL && !motif)
     {
       printf("\nMust supply template XOR batchfile or -m option\n");
       print_info(argv[0]);
     }  
-    else if (template_file != NULL && batch_file != NULL)
+    else if (batch_file != NULL)
     {
       printf("\nMust only supply template file XOR batch file\n");
       print_info(argv[0]);
@@ -1538,19 +837,6 @@ int main(int argc, char** argv)
     }
   }
 
-  if(generateGraphs && !small_sample && !all_n_sample && !samp_from_lst) {
-    if(n && p && s && m) {
-      printf("%d %f %f %d", n, p, s, m);
-      generate_both_graphs(n, p, s, m);
-    } else {
-      printf("\nMissing Arguments\n");
-      printf("%d %f %f %d", n, p, s, m);
-    }
-  }
-  else if(sim_1) {
-    printf("%d %d %f", m, iterations, p);
-    sim1(m, iterations, p, true, isCentered);
-  }
   else if(sim2_corr) {
     const char folderCorr [] = "sim2_corr/";
     char graphACorr [100];
@@ -1584,11 +870,7 @@ int main(int argc, char** argv)
   }
   else if(compare_graphs && motif && sophie) {
     if(sophie) {
-        run_algorithm2(graph_fileA, graph_fileB, motif, labeled,
-              do_vert, do_gdd, 
-              iterations, do_outerloop, calculate_automorphism, 
-              verbose, false, 0, true, isCentered);
-
+      printf("Do nothing");
     } else {
       run_compare_graphs(graph_fileA, graph_fileB, motif,
               do_vert, do_gdd, 
@@ -1596,25 +878,6 @@ int main(int argc, char** argv)
               verbose, false, 0, true, isCentered);
     }
 
-  }
-  else if(many_comp) {
-    all_comp(graph_fileA, do_vert, do_gdd, iterations, do_outerloop, calculate_automorphism, verbose);
-  }
-  else if (small_sample) {
-    samp_comp(graph_fileA, graph_fileB, motif, do_outerloop, iterations, it_edges, samp_nodes, samp_edges, comp_it, calculate_automorphism, isCentered, generateGraphs);
-  }
-  else if (samp_first && (graph_fileB == NULL)) {
-    samp_graphs_lst(graph_fileA, iterations, it_edges, samp_nodes, samp_edges);
-  }
-  else if (samp_first && (graph_fileB != NULL)) {
-    samp_graphs(graph_fileA, iterations, it_edges, samp_nodes, samp_edges);
-    samp_graphs(graph_fileB, iterations, it_edges, samp_nodes, samp_edges);
-  }
-  else if (all_n_sample) {
-    samp_comp_all_n(graph_fileA, graph_fileB, do_outerloop, iterations, it_edges, samp_nodes, samp_edges, comp_it, calculate_automorphism, isCentered, generateGraphs);
-  }
-  else if (samp_from_lst) {
-    samp_all_dcc(graph_fileA, do_outerloop, iterations, it_edges, samp_nodes, samp_edges, comp_it, calculate_automorphism, isCentered);
   }
   else if (count_trees) {
     trees_for_graphs(graph_fileA, iterations, do_outerloop, isCentered);
@@ -1625,13 +888,6 @@ int main(int argc, char** argv)
               do_vert, do_gdd, 
               iterations, do_outerloop, calculate_automorphism, 
               verbose, false, 0, true, isCentered, 2);
-  }
-  else if (template_file != NULL)
-  {
-    run_single(graph_fileA, template_file, labeled,                
-                do_vert, do_gdd,
-                iterations, do_outerloop, calculate_automorphism,
-                verbose, false, 0, true, isCentered);
   }
   else if (batch_file != NULL)
   {
