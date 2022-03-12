@@ -61,7 +61,7 @@ public:
     // philox_k = philox4x32keyinit(philox_uk);
   }
 
-  double do_full_count(Graph* sub_graph, int* labels, int N, bool random_graphs, float p, bool isCentered, int colorKey)
+  double do_full_count(Graph* sub_graph, int* labels, int N, bool random_graphs, int colorKey)
   {  
     num_iter = N;
     t = sub_graph;
@@ -89,10 +89,12 @@ public:
     }
     max_degree = max_out_degree;
 
-    // begin the counting    
-    double count = 0.0;      
+    // begin the counting
+    double count = 0.0;
     for (int j = 0; j < N; j++) {
-      count += template_count(random_graphs, p, isCentered, colorKey); 
+      int increase = template_count(random_graphs, colorKey); 
+      printf("count increased by %d", increase);
+      count += increase;
     }
 
     double final_count = count / (double) N;
@@ -123,7 +125,7 @@ public:
 private:
   // This does a single counting for a given templates
   // Return the full scaled count for the template on the whole graph
-  double template_count(bool random_graphs, float edge_p, bool isCentered, int colorKey)
+  double template_count(bool random_graphs, int colorKey)
   {  
     // do random coloring for full graph
     int num_verts = g->num_vertices();

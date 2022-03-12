@@ -149,6 +149,22 @@ void read_in_graph(Graph& g, char* graph_file, bool labeled,
   //print_my_graph(g);
 }
 
+double get_graph_expectation_count(Graph& g, int k) {
+// (math.factorial(n)/math.factorial(n-K-1))*(q**K)
+  int num_nodes = g.num_vertices();
+  int num_edges = g.num_edges();
+  double q = (double) num_edges / (double)(num_nodes * num_nodes);
+  printf("density: %f", q);
+  double result = 1;
+  for (int i = 0; i < k; i++) {
+    result *= (num_nodes - i) * q * (k+1-i);
+    result /= (k+1);
+  }
+  result *= num_nodes - k;
+  result /= k+1;
+  return result;
+}
+
 std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
                 bool do_vert, bool do_gdd,
                 int iterations, 
@@ -168,6 +184,8 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
   std::vector<double> full_count_arr;
 
   read_in_graph(g, graph_file, labeled, srcs_g, dsts_g, labels_g);
+  double exp = get_graph_expectation_count(g, 6);
+  printf("\n%f is the subtracted expected count\n", exp);
 
   double elt = 0.0;
   if ((timing || verbose) && main) {
@@ -202,7 +220,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
 #pragma omp parallel reduction(+:full_count)
 {
       int tid = omp_get_thread_num();
-      full_count += graph_count[tid].do_full_count(&t, labels_t, iter, random_graphs, p, isCentered, colorKey);
+      full_count += graph_count[tid].do_full_count(&t, labels_t, iter, random_graphs, colorKey);
       if (do_gdd || do_vert)
         vert_counts[tid] = graph_count[tid].get_vert_counts();
 }   
@@ -229,7 +247,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
       colorcount graph_count;
       graph_count.init(g, labels_g, labeled, 
                         calc_auto, do_gdd, do_vert, verbose);
-      full_count += graph_count.do_full_count(&t, labels_t, iterations, random_graphs, p, isCentered, colorKey);
+      full_count += graph_count.do_full_count(&t, labels_t, iterations, random_graphs, colorKey);
     }
 
     // printf("\n");
@@ -237,8 +255,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
     // printf("%e\n", full_count);  
     // check count_automorphissms
     // printf("num of automorphisms: %d\n", count_automorphisms(t));
-  
-    full_count_arr.push_back((full_count)* sqrt(count_automorphisms(t)));
+    full_count_arr.push_back((full_count - exp)* sqrt(count_automorphisms(t)));
 
 
     delete [] srcs_t;
@@ -422,12 +439,11 @@ void select_edges(float s, char in [100], char out [100]) {
 
 }
 
-void sim2(char* graph_fileA, char* graph_fileB, int n, float p, float s, int klow, int khigh, int m, int iterations, bool isCentered, bool Sophie) {
+void sim2(char* graph_fileA, char* graph_fileB, float p, int klow, int khigh, int iterations, bool isCentered) {
     using std::chrono::high_resolution_clock;
     using std::chrono::duration_cast;
     using std::chrono::duration;
     using std::chrono::milliseconds;
-
 
     for(int k = klow+1; k < khigh+2; ++k) {
       auto t1 = high_resolution_clock::now();
@@ -444,17 +460,11 @@ void sim2(char* graph_fileA, char* graph_fileB, int n, float p, float s, int klo
       printf("%e, ", count);
 
       auto t2 = high_resolution_clock::now();
-
       auto ms_int = duration_cast<milliseconds>(t2-t1);
-
       duration<double, std::milli> ms_double = t2 - t1;
-
       // std::cout << "\n" << ms_double.count() << "ms";
       std::cout.flush();
     }
-
-
-
 }
 
 std::unordered_set<int> pickSet(int N, int k, std::mt19937& gen)
@@ -803,13 +813,12 @@ int main(int argc, char** argv)
         abort();
     }
   } 
-  if(!sim2_corr && !sim2_ind && !count_trees)
+  if(!sim2_corr && !sim2_ind && !count_trees && !sophie)
   {
     if(argc < 3)
     {
         print_info_short(argv[0]);
     }
-
     if (motif && (motif < 3 || motif > 10))
     {
       printf("\nMotif option must be between [3,10]\n");    
@@ -836,7 +845,18 @@ int main(int argc, char** argv)
       print_info(argv[0]);
     }
   }
-
+  else if(sophie) {
+    if(graph_fileA == NULL || graph_fileB == NULL) {
+      printf("\nNeed to provide file names with -g -f");
+      abort();
+    }
+    if(p && klow && motif && iterations) {
+      sim2(graph_fileA, graph_fileB, p, klow, motif, iterations, isCentered);
+    } else {
+      printf("\nMissing Arguments\n");
+      printf("%f %d %d %d %d", p, klow, motif, m, iterations);
+    }
+  }
   else if(sim2_corr) {
     const char folderCorr [] = "sim2_corr/";
     char graphACorr [100];
@@ -844,8 +864,7 @@ int main(int argc, char** argv)
     char graphBCorr [100];
     sprintf(graphBCorr, "%s%d_%dB_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, s, p);
     if(n && p && s && m && iterations) {
-       // printf("%d %f %f %d %d %d %d %correlated Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
-        sim2(graphACorr, graphBCorr, n, p, s, klow, motif, m, iterations, isCentered, sophie);
+        sim2(graphACorr, graphBCorr, p, klow, motif, iterations, isCentered);
     }
     else{
       printf("\nMissing Arguments\n");
@@ -859,8 +878,7 @@ int main(int argc, char** argv)
     char graphBInd [100];
     sprintf(graphBInd, "%s%d_%dB_q%.5f_ind.txt", folderInd, m, n, p);
     if(n && p && s && m && iterations) {
-        // printf("%d %f %f %d %d %d %d %d indepedent Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
-        sim2(graphAInd, graphBInd, n, p, s, klow, motif, m, iterations, isCentered, sophie);
+        sim2(graphAInd, graphBInd, p, klow, motif, iterations, isCentered);
     }
     else{
       printf("\nMissing Arguments\n");
@@ -868,15 +886,11 @@ int main(int argc, char** argv)
     }
     fflush( stdout );
   }
-  else if(compare_graphs && motif && sophie) {
-    if(sophie) {
-      printf("Do nothing");
-    } else {
-      run_compare_graphs(graph_fileA, graph_fileB, motif,
-              do_vert, do_gdd, 
-              iterations, do_outerloop, calculate_automorphism, 
-              verbose, false, 0, true, isCentered);
-    }
+  else if(compare_graphs && motif) {
+    run_compare_graphs(graph_fileA, graph_fileB, motif,
+            do_vert, do_gdd, 
+            iterations, do_outerloop, calculate_automorphism, 
+            verbose, false, 0, true, isCentered);
 
   }
   else if (count_trees) {
