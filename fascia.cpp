@@ -261,7 +261,6 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
     // printf("num of automorphisms: %d\n", count_automorphisms(t));
     full_count_arr.push_back((full_count - (exp/count_automorphisms(t)))* sqrt(count_automorphisms(t)));
 
-
     delete [] srcs_t;
     delete [] dsts_t;
     delete [] labels_t;
