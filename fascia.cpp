@@ -149,25 +149,30 @@ void read_in_graph(Graph& g, char* graph_file, bool labeled,
   //print_my_graph(g);
 }
 
-double get_graph_expectation_count(Graph& g, int k) {
+double get_graph_expectation_count(Graph& g, int k, bool random_graphs, float p) {
 // (math.factorial(n)/math.factorial(n-K-1))*(q**K)
   int num_nodes = g.num_vertices();
   int num_edges = g.num_edges();
-  double q = (double) num_edges / (double)(num_nodes * num_nodes);
-  double result = 1;
-  for (int i = 0; i < k; i++) {
-    result *= (num_nodes - i) * q * (k+1-i);
-    result /= (k+1);
+  double q = 0.0;
+  if (random_graphs) {
+    q = p;
+  } else {
+    q = (double) num_edges / (double)(num_nodes * num_nodes);
   }
-  result *= num_nodes - k;
-  result /= k+1;
+  double result = 1;
+  for (int i = 0; i < k-1; i++) {
+    result *= ((num_nodes - i) * q * (k-i));
+    result /= k;
+  }
+  result *= (num_nodes - k+1);
+  result /= k;
   return result;
 }
 
 std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
                 bool do_vert, bool do_gdd,
                 int iterations, 
-                bool do_outerloop, bool calc_auto, bool verbose, bool random_graphs, float p, bool main, bool isCentered, int colorKey)
+                bool do_outerloop, bool calc_auto, bool verbose, bool random_graphs, float p, bool main, bool isCentered, int colorKey, int k)
 {
   Graph g;
   Graph t;
@@ -183,7 +188,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
   std::vector<double> full_count_arr;
 
   read_in_graph(g, graph_file, labeled, srcs_g, dsts_g, labels_g);
-  double exp = get_graph_expectation_count(g, 6);
+  double exp = get_graph_expectation_count(g, k, random_graphs, p);
   printf("%f is the subtracted expected count\n", exp);
 
   double elt = 0.0;
@@ -254,7 +259,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
     // printf("%e\n", full_count);  
     // check count_automorphissms
     // printf("num of automorphisms: %d\n", count_automorphisms(t));
-    full_count_arr.push_back((full_count - exp)* sqrt(count_automorphisms(t)));
+    full_count_arr.push_back((full_count - (exp/count_automorphisms(t)))* sqrt(count_automorphisms(t)));
 
 
     delete [] srcs_t;
@@ -319,7 +324,7 @@ std::vector<double> run_motif(char* graph_file, int motif,
   return run_batch(graph_file, motif_batchfile, false,
             do_vert, do_gdd,
             iterations, 
-            do_outerloop, calc_auto, verbose, random_graphs, p, main, isCentered, colorKey);
+            do_outerloop, calc_auto, verbose, random_graphs, p, main, isCentered, colorKey, motif);
 }
 
 double run_compare_graphs(char* graph_fileA, char* graph_fileB, int motif, 
@@ -438,7 +443,7 @@ void select_edges(float s, char in [100], char out [100]) {
 
 }
 
-void sim2(char* graph_fileA, char* graph_fileB, float p, int klow, int khigh, int iterations, bool isCentered) {
+void sim2(char* graph_fileA, char* graph_fileB, float p, int klow, int khigh, int iterations, bool isCentered, bool random_graphs) {
     using std::chrono::high_resolution_clock;
     using std::chrono::duration_cast;
     using std::chrono::duration;
@@ -453,7 +458,7 @@ void sim2(char* graph_fileA, char* graph_fileB, float p, int klow, int khigh, in
 
 // #pragma omp parallel reduction(+:count)
 // {
-      count = run_compare_graphs(graph_fileA, graph_fileB, k, false, false, iterations, false, true, false, true, p, false, isCentered);
+      count = run_compare_graphs(graph_fileA, graph_fileB, k, false, false, iterations, false, true, false, random_graphs, p, false, isCentered);
 // }
 
       printf("%e, ", count);
@@ -709,9 +714,10 @@ int main(int argc, char** argv)
   int m = 0;
   bool isCentered = false;
   bool sophie = false;
+  bool random_graphs = true;
 
   char c;
-  while ((c = getopt (argc, argv, "g:f:b:m:n:p:s:j:i:k:A:B:C:H:SDWXqacdvrohlz")) != -1)
+  while ((c = getopt (argc, argv, "g:f:b:m:n:p:s:j:i:k:A:B:C:H:SDWXNqacdvrohlz")) != -1)
   {
     switch (c)
     {
@@ -765,6 +771,9 @@ int main(int argc, char** argv)
         break;
       case 'S':
         sophie = true;
+        break;
+      case 'N':
+        random_graphs = false;
         break;
       case 'D':
         isCentered = true;
@@ -850,7 +859,7 @@ int main(int argc, char** argv)
       abort();
     }
     if(p && klow && motif && iterations) {
-      sim2(graph_fileA, graph_fileB, p, klow, motif, iterations, isCentered);
+      sim2(graph_fileA, graph_fileB, p, klow, motif, iterations, isCentered, random_graphs);
     } else {
       printf("\nMissing Arguments\n");
       printf("%f %d %d %d %d", p, klow, motif, m, iterations);
@@ -863,7 +872,7 @@ int main(int argc, char** argv)
     char graphBCorr [100];
     sprintf(graphBCorr, "%s%d_%dB_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, s, p);
     if(n && p && s && m && iterations) {
-        sim2(graphACorr, graphBCorr, p, klow, motif, iterations, isCentered);
+        sim2(graphACorr, graphBCorr, p, klow, motif, iterations, isCentered, random_graphs);
     }
     else{
       printf("\nMissing Arguments\n");
@@ -877,7 +886,7 @@ int main(int argc, char** argv)
     char graphBInd [100];
     sprintf(graphBInd, "%s%d_%dB_q%.5f_ind.txt", folderInd, m, n, p);
     if(n && p && s && m && iterations) {
-        sim2(graphAInd, graphBInd, p, klow, motif, iterations, isCentered);
+        sim2(graphAInd, graphBInd, p, klow, motif, iterations, isCentered, random_graphs);
     }
     else{
       printf("\nMissing Arguments\n");
@@ -904,10 +913,7 @@ int main(int argc, char** argv)
   }
   else if (batch_file != NULL)
   {
-    run_batch(graph_fileA, batch_file, labeled,
-                do_vert, do_gdd,
-                iterations, do_outerloop, calculate_automorphism,
-                verbose, false, 0, true, isCentered, 2);
+    printf("DO NOTHING");
   }
 
   return 0;

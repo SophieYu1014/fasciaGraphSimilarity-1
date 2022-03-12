@@ -165,7 +165,7 @@ private:
     if(random_graphs) {
       edge_prob = edge_p;
     }else {
-      edge_prob = (float) num_edges / choose(num_verts, 2);
+      edge_prob = (float) num_edges / (2*choose(num_verts, 2));
     }
     
     //printf("%d %d %f\n", num_verts, num_edges, edge_prob);
