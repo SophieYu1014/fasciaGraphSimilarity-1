@@ -40,7 +40,7 @@ using namespace std;
 #include "dynamic_table_array.hpp"
 #include "partitioner.hpp"
 #if SIMPLE
-  #include "colorcount_simple.hpp"
+  #include "colorcount.hpp"
 #else
   #include "colorcount.hpp"
 #endif
@@ -154,7 +154,6 @@ double get_graph_expectation_count(Graph& g, int k) {
   int num_nodes = g.num_vertices();
   int num_edges = g.num_edges();
   double q = (double) num_edges / (double)(num_nodes * num_nodes);
-  printf("density: %f", q);
   double result = 1;
   for (int i = 0; i < k; i++) {
     result *= (num_nodes - i) * q * (k+1-i);
@@ -185,7 +184,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
 
   read_in_graph(g, graph_file, labeled, srcs_g, dsts_g, labels_g);
   double exp = get_graph_expectation_count(g, 6);
-  printf("\n%f is the subtracted expected count\n", exp);
+  printf("%f is the subtracted expected count\n", exp);
 
   double elt = 0.0;
   if ((timing || verbose) && main) {
@@ -220,7 +219,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
 #pragma omp parallel reduction(+:full_count)
 {
       int tid = omp_get_thread_num();
-      full_count += graph_count[tid].do_full_count(&t, labels_t, iter, random_graphs, colorKey);
+      full_count += graph_count[tid].do_full_count(&t, labels_t, iter, random_graphs, p, isCentered, colorKey);
       if (do_gdd || do_vert)
         vert_counts[tid] = graph_count[tid].get_vert_counts();
 }   
@@ -247,7 +246,7 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
       colorcount graph_count;
       graph_count.init(g, labels_g, labeled, 
                         calc_auto, do_gdd, do_vert, verbose);
-      full_count += graph_count.do_full_count(&t, labels_t, iterations, random_graphs, colorKey);
+      full_count += graph_count.do_full_count(&t, labels_t, iterations, random_graphs, p, isCentered, colorKey);
     }
 
     // printf("\n");
