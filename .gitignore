@@ -1,6 +1,10 @@
 fascia
 .DS_Store
 fascia.dSYM
+slurmcenter*
+*.sh
+correlated_graphs/*
+independent_graphs/*
 
 # exclude everything
 graphs/*

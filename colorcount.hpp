@@ -4,7 +4,6 @@
 // See COPYING for license.
 
 #include "Random123/philox.h"
-#include <algorithm>
 
 using namespace std;
 
@@ -61,7 +60,7 @@ public:
     // philox_uk.v[0] = time(0)+thread_id;
     // philox_k = philox4x32keyinit(philox_uk);
   }
-  
+
   double do_full_count(Graph* sub_graph, int* labels, int N, bool random_graphs, float p, bool isCentered, int colorKey)
   {  
     num_iter = N;
@@ -69,14 +68,9 @@ public:
     labels_t = labels;          
     
     // create subtemplates and sort them in increasing order 
-if (verbose) {
-    printf("Beginning partitioning ... \n");
-}
     part = partitioner(*t, labeled, labels_t);
     part.sort_subtemplates();
-if (verbose) {
-    printf("done partitioning\n");
-}  
+
     num_colors = t->num_vertices();
     subtemplates = part.get_subtemplates();
     subtemplate_count = part.get_subtemplate_count();    
@@ -94,36 +88,19 @@ if (verbose) {
         }
     }
     max_degree = max_out_degree;
-if (verbose) {
-    printf("n %d, max degree %d\n", num_verts_graph, max_out_degree); 
-}
 
     // begin the counting    
     double count = 0.0;      
-    for (cur_iter = 0; cur_iter < N; cur_iter++)
-    {
-      double elt = 0.0;
-      if (verbose) {
-         elt = timer();
-      }
-      count += template_count(random_graphs, p, isCentered, colorKey);        
-      if (verbose) {          
-         elt = timer() - elt;      
-         printf("Time for count: %9.6lf seconds\n", elt);
-      }
+    for (int j = 0; j < N; j++) {
+      count += template_count(random_graphs, p, isCentered, colorKey); 
     }
 
     double final_count = count / (double) N;
     double prob_colorful = factorial(num_colors) / 
         ( factorial(num_colors - t->num_vertices()) * pow(num_colors, t->num_vertices()) );
     int num_auto = calculate_automorphisms ? count_automorphisms(*t) : 1;    
-    final_count = final_count / (double) num_auto;
-
-if (verbose) {    
-    printf("Probability colorful: %f\n", prob_colorful);
-    printf("Num automorphisms: %d\n", num_auto);
-    printf("Final count: %e\n", final_count);
-}
+    final_count = floor(final_count / ( (double)num_auto) );
+   
 
     if (do_graphlet_freq || do_vert_output)
     {
@@ -146,31 +123,12 @@ if (verbose) {
 private:
   // This does a single counting for a given templates
   // Return the full scaled count for the template on the whole graph
-
-  int choose(int n, int k) {
-    if (k == 0){
-      return 1;
-    } 
-    return (n * choose(n - 1, k - 1)) / k;
-  }
-
-
   double template_count(bool random_graphs, float edge_p, bool isCentered, int colorKey)
   {  
     // do random coloring for full graph
     int num_verts = g->num_vertices();
-    int num_edges = g->num_edges();
-    float edge_prob;
-    if(random_graphs) {
-      edge_prob = edge_p;
-    }else {
-      edge_prob = (float) num_edges / choose(num_verts, 2);
-    }
+    colors_g = new int[num_verts];
     
-    //printf("%d %d %f\n", num_verts, num_edges, edge_prob);
-    colors_g = new int[num_verts];    
-
-
 #pragma omp parallel 
 {
     /* thread-local RNG initialization */
@@ -183,128 +141,38 @@ private:
 #pragma omp for
     for (int v = 0; v < num_verts; ++v)
     {
-      
       rng_ctr[0] = v;
-      rng_ctr[1] = cur_iter;   
+      rng_ctr[1] = cur_iter;      
       r123::Philox4x32::ctr_type r = rng(rng_ctr, rng_key);
 
       int color = r[0] % num_colors;
       colors_g[v] = color;
     }
-
-    // for(int i = 0; i < num_verts; i++) {
-    //   printf("%d ", colors_g[i]);
-    // }
-    // printf("\n");
 }
-
+    
     // start doing the counting, starting at bottom of partition tree
-    //  then go through all of the subtemplates except for the primary
-    //  since that's handled a bit differently
-    for (int s = subtemplate_count - 1; s > 0 ; --s)
+    //  then go through all of the subtemplates
+    float full_count = 0.0;
+    for (int s = subtemplate_count - 1; s >= 0 ; --s)
     {
-      set_count = 0;
-      total_count = 0;
-      read_count = 0;
       int num_verts_sub = num_verts_table[s];
-if (verbose) {    
-      printf("\nIniting with sub %d, verts: %d\n", s, num_verts_sub);
-}      
       int a = part.get_active_index(s);
-      int p = part.get_passive_index(s);
+      int p = part.get_passive_index(s);   
       dt.init_sub(s, a, p);
-      double elt = 0.0;
 
-      if (num_verts_sub == 1)
-      {
-if (verbose) {                  
-          elt = timer();
-}      
-          init_table_node(s);
-if (verbose) {  
-          elt = timer() - elt;
-          fprintf(stderr, "s %d, it node %9.6lf s.\n", s, elt);
-}       
-      } else {
-if (verbose) {  
-        elt = timer();
-}
-        if(isCentered) {
-          colorful_count(s, edge_prob);
-        } else {
-          original_colorful_count(s);
-        }
+      if (num_verts_sub == 1) 
+        init_table_node(s);
+      else
+        full_count = colorful_count_simple(s);
 
-if (verbose) {  
-        elt = timer() - elt;
-        fprintf(stderr, "s %d, array time %9.6lf s.\n", s, elt);
-}  
-      }
-
-#if COLLECT_DATA
-if (verbose) {      
-      double ratio1 = (double)set_count / (double)num_verts;    
-      double ratio2 = (double)read_count / (double)num_verts;    
-      if (num_verts != 0) {    
-        printf("  Sets: %d  Total: %d  Ratio: %f\n", set_count, num_verts, ratio1);
-        printf("  Reads: %d  Total: %d  Ratio: %f\n", read_count, num_verts, ratio2);
-      } else {
-        printf("  Sets: %d  Total: %d\n", set_count, num_verts);
-        printf("  Reads: %d  Total: %d\n", read_count, num_verts);
-      }
-}
-#endif
-      // remove table entries for children of this subtemplate
+      // remove table entries for children of this subtemplate   
       if (a != NULL_VAL)
         dt.clear_sub(a);
       if (p != NULL_VAL)
         dt.clear_sub(p);
-    }  
-if (verbose) {    
-    printf("\nDone with initialization. Doing full count\n");
-} 
-    // do the count for the full template    
-    float full_count = 0;
-    set_count = 0;
-    total_count = 0;
-    read_count = 0;
-    double elt = 0.0;  
+    }
+    delete [] colors_g; 
 
-    int a = part.get_active_index(0);
-    int p = part.get_passive_index(0);
-    dt.init_sub(0, a, p);
-
-if (verbose) {  
-      elt = timer();
-}
-      if(isCentered) {
-        full_count = colorful_count(0, edge_prob);
-      } else {
-        full_count = original_colorful_count(0);
-      }
-if (verbose) {  
-      elt = timer() - elt;
-      fprintf(stderr, "s %d, array time %9.6lf s.\n", 0, elt);
-}
-
-    delete [] colors_g;  
-    dt.clear_sub(a); 
-    dt.clear_sub(p);
-
-#if COLLECT_DATA
-if (verbose) {    
-    double ratio1 = (double)set_count / (double)num_verts;    
-    double ratio2 = (double)read_count / (double)num_verts;      
-    if (num_verts != 0) {
-      printf("  Non-zero: %d  Total: %d  Ratio: %f\n", set_count, num_verts, ratio1);
-      printf("  Reads: %d  Total: %d  Ratio: %f\n", read_count, num_verts, ratio2);  
-    } else {
-      printf("  Non-zero: %d  Total: %d\n", set_count, num_verts);
-      printf("  Reads: %d  Total: %d\n", read_count, num_verts);  
-    }    
-    printf("Full Count: %e\n", full_count);
-}
-#endif
     return (double)full_count;
   }
   
@@ -318,10 +186,8 @@ if (verbose) {
       for (int v = 0; v < num_verts_graph; ++v)
       {  
         int n = colors_g[v]; 
-        dt.set(v, comb_num_indexes_set[s][n], 1.0);
-#if COLLECT_DATA        
+        dt.set(s, v, comb_num_indexes_set[s][n], 1.0);
         set_count_loop++;
-#endif        
       }
     }
     else
@@ -335,10 +201,8 @@ if (verbose) {
         int label_g = labels_g[v];
         if (label_g == label_s)
         {
-          dt.set(v, comb_num_indexes_set[s][n], 1.0);
-#if COLLECT_DATA
+          dt.set(s, v, comb_num_indexes_set[s][n], 1.0);
           set_count_loop++;
-#endif          
         }
       }
     }
@@ -346,246 +210,45 @@ if (verbose) {
     set_count = set_count_loop;
   }
   
-  float colorful_count(int s, float edge_prob)
+  float colorful_count_simple(int s)
   {
-    float cc = 0.0;
-    int num_verts_sub = subtemplates[s].num_vertices();
-    
+    float cc = 0.0;   
     int active_index = part.get_active_index(s);
-    // int passive_index = part.get_passive_index(s);
+    int passive_index = part.get_passive_index(s);
+    int num_verts_sub = num_verts_table[s]; 
     int num_verts_a = num_verts_table[active_index];  
-    int num_combinations = choose_table[num_verts_sub][num_verts_a];  
-    int set_count_loop = 0;
-    int total_count_loop = 0;
-    int read_count_loop = 0;    
+    int num_combinations_sub = choose_table[num_colors][num_verts_sub]; 
+    int num_combinations = choose_table[num_verts_sub][num_verts_a];     
 
-#pragma omp parallel
-{    
-#if TIME_INNERLOOP 
-        double elt = timer();
-#endif
-
-    // int *valid_nbrs = (int *) malloc(max_degree * sizeof(int));
-    int *index_nbrs = (int *) malloc(num_verts_graph * sizeof(int));
-    // assert(valid_nbrs != NULL);
-    assert(index_nbrs != NULL);
-    // int valid_nbrs_count = 0;
-
-    
-#pragma omp for schedule(static) reduction(+:cc) reduction(+:set_count_loop) \
-        reduction(+:total_count_loop) reduction(+:read_count_loop)
+#pragma omp parallel for schedule(static) reduction(+:cc) 
     for (int v = 0; v < num_verts_graph; ++v)
-    {
-      // valid_nbrs_count = 0;
-      for(int i = 0; i < num_verts_graph; ++i){
-        index_nbrs[i] = 0;
-      }
-    
-      if (dt.is_vertex_init_active(v))
-      {
-        int* adjs = g->adjacent_vertices(v);
-        int end = g->out_degree(v);
-        float* counts_a = dt.get_active(v);  
-#if COLLECT_DATA
-        ++read_count_loop;
-#endif 
+    { 
+      int* adjs = g->adjacent_vertices(v);
+      int end = g->out_degree(v);
 
-        for (int i = 0; i < end; ++i) {
-          int adj_i = adjs[i];
-          if (dt.is_vertex_init_passive(adj_i)) {
-            // valid_nbrs[valid_nbrs_count++] = adj_i;
-            index_nbrs[adj_i] = 1;
+      for (int n = 0; n < num_combinations_sub; ++n)
+      {
+        float color_count = 0.0;                
+        int* comb_indexes_a = comb_num_indexes[0][s][n];
+        int* comb_indexes_p = comb_num_indexes[1][s][n];
+
+        int a = 0;         
+        int p = num_combinations - 1;
+        for (; a < num_combinations; ++a, --p) {
+          for (int i = 0; i < end; ++i) {
+            color_count += dt.get(active_index, v, comb_indexes_a[a]) * 
+                dt.get(passive_index, adjs[i], comb_indexes_p[p]);
           }
         }
-        
-
-        int num_combinations_verts_sub = 
-                              choose_table[num_colors][num_verts_sub];
-        for (int n = 0; n < num_combinations_verts_sub; ++n)
-        {
-          float color_count = 0.0;                
-          int* comb_indexes_a = comb_num_indexes[0][s][n];
-          int* comb_indexes_p = comb_num_indexes[1][s][n];
-
-          int p = num_combinations - 1;
-          for (int a = 0; a < num_combinations; ++a, --p) 
-          {
-            float count_a = counts_a[comb_indexes_a[a]];
-            if (count_a) 
-            {
-              // for (int i = 0; i < valid_nbrs_count; ++i) 
-              // {
-//                 color_count += count_a * (1.0 -edge_prob) *
-//                     dt.get_passive(valid_nbrs[i], comb_indexes_p[p]);
-// #if COLLECT_DATA                  
-//                 ++read_count_loop;
-// #endif                  
-//               }
-
-              for(int i = 0; i < num_verts_graph; ++i)
-              {
-
-                //outside node
-                if(i != v) {
-                  if(index_nbrs[i] == 0){
-                    color_count += count_a * (0.0 - edge_prob) * dt.get_passive(i, comb_indexes_p[p]);
-                  }
-                  else{
-                    color_count += count_a * (1.0 - edge_prob) * dt.get_passive(i, comb_indexes_p[p]);
-                  }
-                }
- 
-#if COLLECT_DATA                  
-                ++read_count_loop;
-#endif                  
-              }
-            }
-          }
           
-
-          cc += color_count;
-#if COLLECT_DATA
-          ++set_count_loop;
-#endif              
-          if (s != 0)
-            dt.set(v, comb_num_indexes_set[s][n], color_count);
-          else if (do_graphlet_freq || do_vert_output)
-            final_vert_counts[v] += (double)color_count;
-
-#if COLLECT_DATA            
-          ++total_count_loop;
-#endif
-        }
-        
+        cc += color_count;
+        if (s != 0)
+          dt.set(s, v, comb_num_indexes_set[s][n], color_count);
+        else if (do_graphlet_freq || do_vert_output)
+          final_vert_counts[v] += (double)color_count;          
       }
     }
-#if TIME_INNERLOOP
-#ifdef _OPENMP
-    int tid = omp_get_thread_num();
-#else
-    int tid = 0;
-#endif
-    elt = timer() - elt;
-    fprintf(stderr, "tid %d, time %9.6lf s.\n", tid, elt);
-#endif
 
-    // free(valid_nbrs);    
-    free(index_nbrs);
-} // end parallel
-
-    set_count = set_count_loop;
-    total_count = total_count_loop;
-    read_count = read_count_loop;
-    
-    return cc;
-  }
-
-float original_colorful_count(int s)
-  {
-    float cc = 0.0;
-    int num_verts_sub = subtemplates[s].num_vertices();
-    
-    int active_index = part.get_active_index(s);
-    // int passive_index = part.get_passive_index(s);
-    int num_verts_a = num_verts_table[active_index];  
-    int num_combinations = choose_table[num_verts_sub][num_verts_a];;  
-    int set_count_loop = 0;
-    int total_count_loop = 0;
-    int read_count_loop = 0;    
-
-#pragma omp parallel
-{    
-#if TIME_INNERLOOP 
-        double elt = timer();
-#endif
-
-    int *valid_nbrs = (int *) malloc(max_degree * sizeof(int));
-    assert(valid_nbrs != NULL);
-    int valid_nbrs_count = 0;
-    
-#pragma omp for schedule(static) reduction(+:cc) reduction(+:set_count_loop) \
-        reduction(+:total_count_loop) reduction(+:read_count_loop)
-    for (int v = 0; v < num_verts_graph; ++v)
-    {
-      valid_nbrs_count = 0;
-      
-      if (dt.is_vertex_init_active(v))
-      {
-        int* adjs = g->adjacent_vertices(v);
-        int end = g->out_degree(v);
-        float* counts_a = dt.get_active(v);  
-#if COLLECT_DATA
-        ++read_count_loop;
-#endif      
-        for (int i = 0; i < end; ++i) {
-          int adj_i = adjs[i];
-          if (dt.is_vertex_init_passive(adj_i)) {
-            valid_nbrs[valid_nbrs_count++] = adj_i;
-          }
-        }
-        
-        if (valid_nbrs_count)
-        {
-          int num_combinations_verts_sub = 
-                                choose_table[num_colors][num_verts_sub];
-          for (int n = 0; n < num_combinations_verts_sub; ++n)
-          {
-            float color_count = 0.0;                
-            int* comb_indexes_a = comb_num_indexes[0][s][n];
-            int* comb_indexes_p = comb_num_indexes[1][s][n];
-
-            int p = num_combinations - 1;
-            for (int a = 0; a < num_combinations; ++a, --p) 
-            {
-              int count_a = counts_a[comb_indexes_a[a]];
-              if (count_a) 
-              {
-                for (int i = 0; i < valid_nbrs_count; ++i) 
-                {
-                  color_count += count_a * 
-                      dt.get_passive(valid_nbrs[i], comb_indexes_p[p]);
-#if COLLECT_DATA                  
-                  ++read_count_loop;
-#endif                  
-                }
-              }
-            }
-            
-            if (color_count > 0.0)
-            {
-              cc += color_count;
-#if COLLECT_DATA
-              ++set_count_loop;
-#endif              
-              if (s != 0)
-                dt.set(v, comb_num_indexes_set[s][n], color_count);
-              else if (do_graphlet_freq || do_vert_output)
-                final_vert_counts[v] += (double)color_count;
-            }
-#if COLLECT_DATA            
-            ++total_count_loop;
-#endif
-          }
-        }
-      }
-    }
-#if TIME_INNERLOOP
-#ifdef _OPENMP
-    int tid = omp_get_thread_num();
-#else
-    int tid = 0;
-#endif
-    elt = timer() - elt;
-    fprintf(stderr, "tid %d, time %9.6lf s.\n", tid, elt);
-#endif
-
-    free(valid_nbrs);    
-} // end parallel
-
-    set_count = set_count_loop;
-    total_count = total_count_loop;
-    read_count = read_count_loop;
-    
     return cc;
   }
  
@@ -773,9 +436,7 @@ float original_colorful_count(int s)
         if (num_verts_sub > 1)
         {  
           int num_verts_a = part.get_num_verts_active(s);
-          int num_verts_p = part.get_num_verts_passive(s);          
-          // int active_index = part.get_active_index(s);
-          // int passive_index = part.get_passive_index(s);
+          int num_verts_p = part.get_num_verts_passive(s);
       
           int* colors_a;        
           int* colors_p;

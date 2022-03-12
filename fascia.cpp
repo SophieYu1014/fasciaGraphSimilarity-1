@@ -349,7 +349,8 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
     // printf("%e\n", full_count);  
     // check count_automorphissms
     // printf("num of automorphisms: %d\n", count_automorphisms(t));
-    full_count_arr.push_back(full_count * sqrt(count_automorphisms(t)));
+  
+    full_count_arr.push_back((full_count)* sqrt(count_automorphisms(t)));
 
 
     delete [] srcs_t;
@@ -566,13 +567,20 @@ double run_algorithm2(char* graph_fileA, char* graph_fileB, int motif, bool labe
       full_countB += graph_countB.do_full_count(&t, labels_t, iterations, random_graphs, p, isCentered, colorKey_B);
     }
 
-    // printf("fullcountA: %e\n", full_countA);
-    // printf("fullcountB: %e\n", full_countB);
- 
-    // check count_automorphissms
-    // printf("num of automorphisms: %d\n", count_automorphisms(t));
-    final_count += full_countA * full_countB * count_automorphisms(t);
-    //printf("%e\n", final_count);
+    double sophie_check_A = 0.0;
+    double sophie_check_B = 0.0;
+    double sophie_check_product = 0.0;
+    sophie_check_A = full_countA - (61 / count_automorphisms(t));
+    printf("fullcountA_centered: %f\n",  sophie_check_A);
+    sophie_check_B = full_countB - (61 / count_automorphisms(t));
+    printf("fullcountB_centered: %f\n",  sophie_check_B);
+    sophie_check_product = sophie_check_A * sophie_check_B;
+    printf("product: %f\n",  sophie_check_product);
+    // check count_automorphisms
+    printf("num of automorphisms: %d\n", count_automorphisms(t));
+    final_count +=( full_countA - (61/ count_automorphisms(t)))* (full_countB-(61/ count_automorphisms(t))) * count_automorphisms(t);
+    //printf("%e\n", final_countA - (61/ count_automorphisms(t)));
+    //printf("%e\n", final_countB - (61/ count_automorphisms(t)));
 
 
     delete [] srcs_t;
@@ -622,6 +630,7 @@ double run_compare_graphs(char* graph_fileA, char* graph_fileB, int motif,
 
   std::vector<double>().swap(a);
   std::vector<double>().swap(b);
+  
 
   if (timing && main) {
     elt = timer() - elt;
@@ -829,8 +838,8 @@ void generate_ind_graphs(int n, float p, float s, int m_rep) {
     char graphB [100];
     sprintf(graphB, "%s%d_%dB_%.5f_%.5f_ind.txt", folder, m_rep, n, p, s);
     
-    generate_graph(n, p, graphA);
-    generate_graph(n, p, graphB);
+    generate_graph(n, p*s, graphA);
+    generate_graph(n, p*s, graphB);
 
 }
 
@@ -892,7 +901,6 @@ void sim2(char* graph_fileA, char* graph_fileB, int n, float p, float s, int klo
 // }
 
       printf("%e, ", count);
-
 
       auto t2 = high_resolution_clock::now();
 
@@ -1331,6 +1339,7 @@ void trees_for_graphs(string file_list, int iterations,
 int main(int argc, char** argv)
 {
   // remove buffer so all outputs show up before crash
+  srand(time(NULL));
   setbuf(stdout, NULL);
 
   char* graph_fileA = NULL;
@@ -1545,11 +1554,11 @@ int main(int argc, char** argv)
   else if(sim2_corr) {
     const char folderCorr [] = "sim2_corr/";
     char graphACorr [100];
-    sprintf(graphACorr, "%s%d_%dA_%.5f_%.5f_corr.txt", folderCorr, m, n, p, s);
+    sprintf(graphACorr, "%s%d_%dA_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, s, p);
     char graphBCorr [100];
-    sprintf(graphBCorr, "%s%d_%dB_%.5f_%.5f_corr.txt", folderCorr, m, n, p, s);
+    sprintf(graphBCorr, "%s%d_%dB_rho%.5f_q%.5f_corr.txt", folderCorr, m, n, s, p);
     if(n && p && s && m && iterations) {
-        // printf("%d %f %f %d %d %d %d %d correlated Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
+       // printf("%d %f %f %d %d %d %d %correlated Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
         sim2(graphACorr, graphBCorr, n, p, s, klow, motif, m, iterations, isCentered, sophie);
     }
     else{
@@ -1560,9 +1569,9 @@ int main(int argc, char** argv)
   else if(sim2_ind) {
     const char folderInd [] = "sim2_ind/";
     char graphAInd [100];
-    sprintf(graphAInd, "%s%d_%dA_%.5f_%.5f_ind.txt", folderInd, m, n, p, s);
+    sprintf(graphAInd, "%s%d_%dA_q%.5f_ind.txt", folderInd, m, n, p);
     char graphBInd [100];
-    sprintf(graphBInd, "%s%d_%dB_%.5f_%.5f_ind.txt", folderInd, m, n, p, s);
+    sprintf(graphBInd, "%s%d_%dB_q%.5f_ind.txt", folderInd, m, n, p);
     if(n && p && s && m && iterations) {
         // printf("%d %f %f %d %d %d %d %d indepedent Sophie: %d", n, p, s, klow, motif, m, iterations, isCentered, sophie);
         sim2(graphAInd, graphBInd, n, p, s, klow, motif, m, iterations, isCentered, sophie);
@@ -1570,7 +1579,8 @@ int main(int argc, char** argv)
     else{
       printf("\nMissing Arguments\n");
       printf("%d %f %f %d %d %d %d", n, p, s, klow, motif, m, iterations);
-    } 
+    }
+    fflush( stdout );
   }
   else if(compare_graphs && motif && sophie) {
     if(sophie) {
