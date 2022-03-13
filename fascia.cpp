@@ -153,12 +153,14 @@ double get_graph_expectation_count(Graph& g, int k, bool random_graphs, float p)
 // (math.factorial(n)/math.factorial(n-K-1))*(q**K)
   int num_nodes = g.num_vertices();
   int num_edges = g.num_edges();
+  printf("edges: %d, nodes: %d\n", num_edges, num_nodes);
   double q = 0.0;
   if (random_graphs) {
     q = p;
   } else {
-    q = (double) num_edges / (double)(num_nodes * num_nodes);
+    q = (double) num_edges / ((double)num_nodes * (double)num_nodes);
   }
+  printf("q: %f\n", q);
   double result = 1;
   for (int i = 0; i < k-1; i++) {
     result *= ((num_nodes - i) * q * (k-i));
@@ -858,6 +860,7 @@ int main(int argc, char** argv)
       abort();
     }
     if(p && klow && motif && iterations) {
+      printf("RANDOM_GRAPHS: %d\n", random_graphs);
       sim2(graph_fileA, graph_fileB, p, klow, motif, iterations, isCentered, random_graphs);
     } else {
       printf("\nMissing Arguments\n");
