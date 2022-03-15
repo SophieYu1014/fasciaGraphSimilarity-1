@@ -191,7 +191,6 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
 
   read_in_graph(g, graph_file, labeled, srcs_g, dsts_g, labels_g);
   double exp = get_graph_expectation_count(g, k, random_graphs, p);
-  printf("%f is the subtracted expected count\n", exp);
 
   double elt = 0.0;
   if ((timing || verbose) && main) {
@@ -260,9 +259,10 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
 
     // printf("%e\n", full_count);  
     // check count_automorphissms
-    // printf("num of automorphisms: %d\n", count_automorphisms(t));
+    // printf("\n num of automorphisms: %d\n", count_automorphisms(t));
     full_count_arr.push_back((full_count - (exp/count_automorphisms(t)))* sqrt(count_automorphisms(t)));
-
+    // printf("\n exp/auto %f \n ", (exp/count_automorphisms(t)) );
+    // printf("\n full_count  %f \n \n ", full_count);
     delete [] srcs_t;
     delete [] dsts_t;
     delete [] labels_t;
@@ -339,10 +339,10 @@ double run_compare_graphs(char* graph_fileA, char* graph_fileB, int motif,
     elt = timer();
   }
 
-  int colorKey = rand();
-  
-  std::vector<double> a = run_motif(graph_fileA, motif, do_vert, do_gdd, iterations, do_outerloop, calc_auto, verbose, random_graphs, p, false, isCentered, colorKey);
-  std::vector<double> b = run_motif(graph_fileB, motif, do_vert, do_gdd, iterations, do_outerloop, calc_auto, verbose, random_graphs, p, false, isCentered, colorKey);
+  int colorKey_A = rand();
+  std::vector<double> a = run_motif(graph_fileA, motif, do_vert, do_gdd, iterations, do_outerloop, calc_auto, verbose, random_graphs, p, false, isCentered, colorKey_A);
+  int colorKey_B = rand();
+  std::vector<double> b = run_motif(graph_fileB, motif, do_vert, do_gdd, iterations, do_outerloop, calc_auto, verbose, random_graphs, p, false, isCentered, colorKey_B);
 
   double stat = std::inner_product(std::begin(a), std::end(a), std::begin(b), 0.0);
 

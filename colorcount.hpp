@@ -108,17 +108,23 @@ if (verbose) {
       }
       double increase = template_count(random_graphs, p, isCentered, colorKey);
       count += increase;
+      //printf("\n increase %f", increase);
       if (verbose) {
          elt = timer() - elt;
          printf("Time for count: %9.6lf seconds\n", elt);
       }
     }
-
+    //printf("\n The final count %f",count);
     double final_count = count / (double) N;
+    //printf("\n N equals \n %d", N);
+    // printf("\n The final count %f after devide N",final_count);
+
     double prob_colorful = factorial(num_colors) /
         ( factorial(num_colors - t->num_vertices()) * pow(num_colors, t->num_vertices()) );
     int num_auto = calculate_automorphisms ? count_automorphisms(*t) : 1;
     final_count = final_count / (double) num_auto;
+    printf("\n The num_auto %f", (double) num_auto);
+    printf("\n The final count %f after devide N and auto \n",final_count);
 
 if (verbose) {    
     printf("Probability colorful: %f\n", prob_colorful);
@@ -191,7 +197,12 @@ private:
 
       int color = r[0] % num_colors;
       colors_g[v] = color;
+      if (v<10){
+      // printf("%d",color);
+      }
     }
+    //printf("\n ");
+
 
     // for(int i = 0; i < num_verts; i++) {
     //   printf("%d ", colors_g[i]);
