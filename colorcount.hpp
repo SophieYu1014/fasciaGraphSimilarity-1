@@ -123,8 +123,8 @@ if (verbose) {
         ( factorial(num_colors - t->num_vertices()) * pow(num_colors, t->num_vertices()) );
     int num_auto = calculate_automorphisms ? count_automorphisms(*t) : 1;
     final_count = final_count / (double) num_auto;
-    printf("\n The num_auto %f", (double) num_auto);
-    printf("\n The final count %f after devide N and auto \n",final_count);
+//    printf("\n The num_auto %f", (double) num_auto);
+//    printf("\n The final count %f after devide N and auto \n",final_count);
 
 if (verbose) {    
     printf("Probability colorful: %f\n", prob_colorful);

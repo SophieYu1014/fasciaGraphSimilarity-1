@@ -260,7 +260,11 @@ std::vector<double> run_batch(char* graph_file, char* batch_file, bool labeled,
     // printf("%e\n", full_count);  
     // check count_automorphissms
     // printf("\n num of automorphisms: %d\n", count_automorphisms(t));
-    full_count_arr.push_back((full_count - (exp/count_automorphisms(t)))* sqrt(count_automorphisms(t)));
+    if (isCentered) {
+        full_count_arr.push_back(full_count * sqrt(count_automorphisms(t)));
+    } else {
+        full_count_arr.push_back((full_count - (exp/count_automorphisms(t)))* sqrt(count_automorphisms(t)));
+    }
     // printf("\n exp/auto %f \n ", (exp/count_automorphisms(t)) );
     // printf("\n full_count  %f \n \n ", full_count);
     delete [] srcs_t;
@@ -860,7 +864,6 @@ int main(int argc, char** argv)
       abort();
     }
     if(p && klow && motif && iterations) {
-      printf("RANDOM_GRAPHS: %d\n", random_graphs);
       sim2(graph_fileA, graph_fileB, p, klow, motif, iterations, isCentered, random_graphs);
     } else {
       printf("\nMissing Arguments\n");
