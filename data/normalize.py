@@ -22,7 +22,7 @@ def populate_normalization_dict(filenames):
     print("Found {} unique BGP identifiers".format(len(all_values)))
     vlist = list(all_values)
     vlist.sort()
-    return { v: k+1 for k, v in enumerate(vlist) }
+    return { v: k for k, v in enumerate(vlist) }
 
 
 def transform_file(fname, ndict):
