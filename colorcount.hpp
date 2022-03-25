@@ -62,7 +62,7 @@ public:
     // philox_k = philox4x32keyinit(philox_uk);
   }
   
-  double do_full_count(Graph* sub_graph, int* labels, int N, bool random_graphs, float p, bool isCentered, int colorKey)
+  double do_full_count(Graph* sub_graph, int* labels, int N, bool random_graphs, float p, bool isCentered, int colorKey, bool power_law)
   {  
     num_iter = N;
     t = sub_graph;
@@ -106,7 +106,7 @@ if (verbose) {
       if (verbose) {
          elt = timer();
       }
-      double increase = template_count(random_graphs, p, isCentered, colorKey);
+      double increase = template_count(random_graphs, p, isCentered, colorKey, power_law);
       count += increase;
       //printf("\n increase %f", increase);
       if (verbose) {
@@ -162,7 +162,7 @@ private:
   }
 
 
-  double template_count(bool random_graphs, float edge_p, bool isCentered, int colorKey)
+  double template_count(bool random_graphs, float edge_p, bool isCentered, int colorKey, bool power_law)
   {  
     // do random coloring for full graph
     int num_verts = g->num_vertices();
@@ -242,7 +242,7 @@ if (verbose) {
         elt = timer();
 }
         if(isCentered) {
-          colorful_count(s, edge_prob);
+          colorful_count(s, edge_prob, power_law);
         } else {
           original_colorful_count(s);
         }
@@ -290,7 +290,7 @@ if (verbose) {
       elt = timer();
 }
       if(isCentered) {
-        full_count = colorful_count(0, edge_prob);
+        full_count = colorful_count(0, edge_prob, power_law);
       } else {
         full_count = original_colorful_count(0);
       }
@@ -358,7 +358,7 @@ if (verbose) {
     set_count = set_count_loop;
   }
   
-  float colorful_count(int s, float edge_prob)
+  float colorful_count(int s, float edge_prob, bool power_law)
   {
     float cc = 0.0;
     int num_verts_sub = subtemplates[s].num_vertices();
@@ -439,11 +439,18 @@ if (verbose) {
 
                 //outside node
                 if(i != v) {
+//                  int i_vertice = g->get_node_degree(i);
+//                  int v_vertice = g->get_node_degree(v);
+                  double ivcoeff = g->calc_node_coefficient(i, v);
+                  if (!power_law) {
+                    ivcoeff = edge_prob;
+                  }
+//                  printf("i %d  v %d i_n %d v_n %d coeff %f\n",i, v,i_vertice, v_vertice, ivcoeff);
                   if(index_nbrs[i] == 0){
-                    color_count += count_a * (0.0 - edge_prob) * dt.get_passive(i, comb_indexes_p[p]);
+                    color_count += count_a * (0.0 - ivcoeff) * dt.get_passive(i, comb_indexes_p[p]);
                   }
                   else{
-                    color_count += count_a * (1.0 - edge_prob) * dt.get_passive(i, comb_indexes_p[p]);
+                    color_count += count_a * (1.0 - ivcoeff) * dt.get_passive(i, comb_indexes_p[p]);
                   }
                 }
  

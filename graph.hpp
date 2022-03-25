@@ -15,6 +15,7 @@ public:
     max_deg = 0;
     adjacency_array = new int[2*m];
     degree_list = new int[n+1];
+    node_degree_output = new int[n];
     degree_list[0] = 0;
 
     int* temp_deg_list = new int[n];
@@ -25,6 +26,12 @@ public:
       temp_deg_list[srcs[i]]++;
       temp_deg_list[dsts[i]]++;
     }
+
+    copy(temp_deg_list, temp_deg_list+n, node_degree_output);
+//    for (int i = 0; i < n; i++) {
+//        std::cout << i << ":" << node_degree_output[i] << " N" << std::endl;
+//    }
+
     for (int i = 0; i < n; ++i)
       max_deg = temp_deg_list[i] > max_deg ? temp_deg_list[i] : max_deg;
     for (int i = 0; i < n; ++i)
@@ -43,7 +50,17 @@ public:
   {
     return (&adjacency_array[degree_list[v]]);
   }
-  
+
+  int get_node_degree(int v)
+  {
+    return node_degree_output[v];
+  }
+
+  double calc_node_coefficient(int i, int v)
+  {
+    return (double) node_degree_output[i] * (double) node_degree_output[v] / (double) num_edgs;
+  }
+
   int out_degree(int v)
   {
     return degree_list[v+1] - degree_list[v];
@@ -102,5 +119,6 @@ private:
 
   int* adjacency_array;
   int* degree_list;
+  int* node_degree_output;
 
 };
